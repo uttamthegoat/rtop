@@ -1,0 +1,27 @@
+# Maintainer: rtop <user@example.com>
+
+pkgname=rtop
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="A terminal-based Linux system monitor inspired by htop"
+arch=('x86_64')
+url="https://github.com/user/rtop"
+license=('MIT')
+depends=('glibc' 'gcc-libs')
+makedepends=('rust' 'cargo')
+install=rtop.install
+source=("rtop-$pkgver.tar.gz")
+sha256sums=('SKIP')
+provides=('rtop')
+
+build() {
+  cd "$srcdir/rtop-$pkgver"
+  export RUSTFLAGS="-C target-cpu=native"
+  cargo build --release --frozen
+}
+
+package() {
+  cd "$srcdir/rtop-$pkgver"
+  install -Dm755 "target/release/rtop" "$pkgdir/usr/bin/rtop"
+  install -Dm644 "Setup.md" "$pkgdir/usr/share/doc/rtop/Setup.md"
+}
