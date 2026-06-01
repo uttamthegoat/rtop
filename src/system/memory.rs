@@ -90,6 +90,10 @@ impl MemoryCollector {
             }
         }
 
+        if info.mem_available == 0 {
+            info.mem_available = info.mem_free + info.buffers + info.cached;
+        }
+
         info
     }
 }

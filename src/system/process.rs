@@ -1,19 +1,40 @@
 use crate::models::process_info::ProcessInfo;
 use procfs::process::Process;
 use std::collections::HashMap;
+use std::sync::OnceLock;
+
+fn get_uid_map() -> &'static HashMap<u32, String> {
+    static MAP: OnceLock<HashMap<u32, String>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let mut map = HashMap::new();
+        let raw = std::fs::read_to_string("/etc/passwd").unwrap_or_default();
+        for line in raw.lines() {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() > 2 {
+                if let Ok(uid) = parts[2].parse::<u32>() {
+                    map.insert(uid, parts[0].to_string());
+                }
+            }
+        }
+        map
+    })
+}
 
 pub struct ProcessCollector {
     prev_cpu_times: HashMap<u32, (u64, u64)>,
     prev_total_cpu_time: u64,
     processes: Vec<ProcessInfo>,
+    first_tick: bool,
 }
 
 impl ProcessCollector {
     pub fn new() -> Self {
+        let current_total = Self::total_cpu_time();
         Self {
             prev_cpu_times: HashMap::new(),
-            prev_total_cpu_time: 0,
+            prev_total_cpu_time: current_total,
             processes: Vec::new(),
+            first_tick: true,
         }
     }
 
@@ -21,8 +42,16 @@ impl ProcessCollector {
         let mut new_processes = Vec::new();
         let mut new_cpu_times: HashMap<u32, (u64, u64)> = HashMap::new();
         let current_total_cpu_time = Self::total_cpu_time();
-        let total_cpu_delta = current_total_cpu_time - self.prev_total_cpu_time;
+        let total_cpu_delta = current_total_cpu_time.saturating_sub(self.prev_total_cpu_time);
         let total_memory = Self::total_memory();
+
+        if self.first_tick || total_cpu_delta == 0 {
+            self.first_tick = false;
+            self.processes = Vec::new();
+            self.prev_cpu_times.clear();
+            self.prev_total_cpu_time = current_total_cpu_time;
+            return;
+        }
 
         if let Ok(all_proc) = procfs::process::all_processes() {
             for proc in all_proc.flatten() {
@@ -74,7 +103,10 @@ impl ProcessCollector {
 
         let user = proc.status()
             .ok()
-            .map(|s| format!("{}", s.euid))
+            .map(|s| {
+                let uid = s.euid;
+                get_uid_map().get(&uid).cloned().unwrap_or_else(|| uid.to_string())
+            })
             .unwrap_or_else(|| "?".to_string());
 
         let priority = stat.priority;

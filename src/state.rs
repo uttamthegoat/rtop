@@ -8,9 +8,9 @@ pub struct AppState {
     pub search_mode: bool,
     pub selected_row: usize,
     pub show_tree: bool,
-    pub scroll_offset: usize,
     pub should_quit: bool,
     pub needs_refresh: bool,
+    pub status_message: Option<String>,
     pub terminal_width: u16,
     pub terminal_height: u16,
 }
@@ -24,9 +24,9 @@ impl AppState {
             search_mode: false,
             selected_row: 0,
             show_tree: false,
-            scroll_offset: 0,
             should_quit: false,
             needs_refresh: false,
+            status_message: None,
             terminal_width: 0,
             terminal_height: 0,
         }

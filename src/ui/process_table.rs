@@ -24,7 +24,7 @@ pub fn render_process_table(frame: &mut Frame, area: Rect, state: &AppState, the
 
     let visible_height = area.height.saturating_sub(2) as usize;
 
-    let (rows, scroll) = if state.show_tree {
+    let (rows, _scroll, rel_selected) = if state.show_tree {
         let children = build_tree(&state.processes);
         let roots: Vec<usize> = (0..state.processes.len())
             .filter(|&i| {
@@ -35,8 +35,14 @@ pub fn render_process_table(frame: &mut Frame, area: Rect, state: &AppState, the
         let mut flat = Vec::new();
         flatten_tree(&children, &roots, 0, &state.processes, &mut flat);
 
+        let tree_idx = if let Some(selected) = state.processes.get(state.selected_row) {
+            flat.iter().position(|(p, _)| p.pid == selected.pid).unwrap_or(0)
+        } else {
+            0
+        };
+
         let total = flat.len();
-        let scroll = scroll_offset(state.selected_row, visible_height, total);
+        let scroll = scroll_offset(tree_idx, visible_height, total);
         let end = (scroll + visible_height).min(total);
         let visible = &flat[scroll..end];
 
@@ -56,7 +62,7 @@ pub fn render_process_table(frame: &mut Frame, area: Rect, state: &AppState, the
             ];
             Row::new(cells).style(Style::default().fg(theme.text))
         }).collect();
-        (rows, scroll)
+        (rows, scroll, tree_idx.saturating_sub(scroll))
     } else {
         let total = state.processes.len();
         let scroll = scroll_offset(state.selected_row, visible_height, total);
@@ -78,7 +84,7 @@ pub fn render_process_table(frame: &mut Frame, area: Rect, state: &AppState, the
             ];
             Row::new(cells).style(Style::default().fg(theme.text))
         }).collect();
-        (rows, scroll)
+        (rows, scroll, state.selected_row.saturating_sub(scroll))
     };
 
     let title = if state.search_mode {
@@ -110,7 +116,6 @@ pub fn render_process_table(frame: &mut Frame, area: Rect, state: &AppState, the
     )
     .row_highlight_style(selected_style);
 
-    let rel_selected = state.selected_row.saturating_sub(scroll);
     let mut table_state = TableState::new().with_selected(Some(rel_selected));
     frame.render_stateful_widget(table, area, &mut table_state);
 }

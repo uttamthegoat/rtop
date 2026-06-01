@@ -70,8 +70,8 @@ fn get_statvfs(path: &str) -> Option<(u64, u64, u64, f64)> {
     }
     let total = (stat.f_blocks as u64).saturating_mul(stat.f_frsize as u64);
     let available = (stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64);
-    let free = (stat.f_bfree as u64).saturating_mul(stat.f_frsize as u64);
-    let used = total.saturating_sub(free);
+    let _free = (stat.f_bfree as u64).saturating_mul(stat.f_frsize as u64);
+    let used = total.saturating_sub(available);
     let percent = if total > 0 {
         (used as f64 / total as f64) * 100.0
     } else {

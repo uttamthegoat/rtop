@@ -3,14 +3,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-if [ ! -f "rtop-0.1.0.tar.gz" ]; then
-  echo "Source tarball not found. Run build.sh first."
-  exit 1
-fi
+bash build.sh
 
 if pacman -Qi rtop &>/dev/null; then
   echo "Removing existing rtop package..."
   sudo pacman -R --noconfirm rtop
 fi
 
-makepkg -si "$@"
+makepkg -sf
+
+sudo pacman -U ./rtop-0.1.0-*.pkg.tar.zst

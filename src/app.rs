@@ -31,8 +31,10 @@ pub struct App {
 
 impl App {
     pub fn new(config: Config) -> Result<Self> {
+        let mut state = AppState::new();
+        state.show_tree = config.show_tree;
         Ok(Self {
-            state: AppState::new(),
+            state,
             cpu_collector: CpuCollector::new(),
             memory_collector: MemoryCollector::new(),
             disk_collector: DiskCollector::new(),
@@ -76,6 +78,7 @@ impl App {
             if let Some(event) = events.next().await {
                 match event {
                     Event::Tick => {
+                        self.state.status_message = None;
                         self.refresh_data().await;
                         self.draw(terminal)?;
                     }
@@ -210,7 +213,10 @@ impl App {
             }
             Action::Kill => {
                 if let Some(process) = self.state.processes.get(self.state.selected_row) {
-                        let _ = kill_process(process.pid);
+                    match kill_process(process.pid) {
+                        Ok(()) => self.state.status_message = Some(format!("Killed PID {}", process.pid)),
+                        Err(e) => self.state.status_message = Some(format!("Kill failed: {}", e)),
+                    }
                 }
             }
             Action::ToggleTree => self.state.show_tree = !self.state.show_tree,

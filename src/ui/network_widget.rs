@@ -44,13 +44,13 @@ pub fn render_network_widget(frame: &mut Frame, area: Rect, stats: &SystemStats,
         let b = i * 5;
 
         frame.render_widget(
-            Paragraph::new(Text::from(format!(" {}", info.interface))),
+            Paragraph::new(Text::from(format!(" {}", info.display_name))),
             layout[b],
         );
 
         frame.render_widget(
             Paragraph::new(Text::from(format!(
-                "{:>18}    {:>17}",
+                "{:>9}    {:>15}",
                 "Download", "Upload"
             ))),
             layout[b + 1],

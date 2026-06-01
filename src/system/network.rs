@@ -1,5 +1,61 @@
 use std::collections::HashMap;
 use std::fs;
+use std::time::Instant;
+
+fn is_wireless(iface: &str) -> bool {
+    let path = format!("/sys/class/net/{}/wireless", iface);
+    std::path::Path::new(&path).exists()
+}
+
+fn get_wifi_ssid(iface: &str) -> Option<String> {
+    if let Ok(out) = std::process::Command::new("nmcli")
+        .args(["-t", "-f", "NAME,DEVICE", "connection", "show", "--active"])
+        .output()
+    {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            for line in text.lines() {
+                let parts: Vec<&str> = line.rsplitn(2, ':').collect();
+                if parts.len() == 2 && parts[0] == iface {
+                    let name = parts[1].trim().to_string();
+                    if !name.is_empty() {
+                        return Some(name);
+                    }
+                }
+            }
+        }
+    }
+    if let Ok(out) = std::process::Command::new("iwgetid")
+        .arg("-r")
+        .arg(iface)
+        .output()
+    {
+        if out.status.success() {
+            let ssid = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !ssid.is_empty() {
+                return Some(ssid);
+            }
+        }
+    }
+    if let Ok(out) = std::process::Command::new("iw")
+        .args(["dev", iface, "link"])
+        .output()
+    {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            for line in text.lines() {
+                let line = line.trim();
+                if let Some(ssid) = line.strip_prefix("SSID:") {
+                    let s = ssid.trim().to_string();
+                    if !s.is_empty() {
+                        return Some(s);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct NetworkStats {
@@ -15,6 +71,7 @@ pub struct NetworkStats {
 #[derive(Debug, Clone)]
 pub struct NetworkInfo {
     pub interface: String,
+    pub display_name: String,
     pub current_rx: u64,
     pub current_tx: u64,
     pub top_rx: u64,
@@ -30,6 +87,8 @@ pub struct NetworkCollector {
     top_tx: HashMap<String, u64>,
     total_rx: HashMap<String, u64>,
     total_tx: HashMap<String, u64>,
+    first_tick: bool,
+    ssid_cache: HashMap<String, (String, Instant)>,
 }
 
 impl NetworkCollector {
@@ -41,12 +100,19 @@ impl NetworkCollector {
             top_tx: HashMap::new(),
             total_rx: HashMap::new(),
             total_tx: HashMap::new(),
+            first_tick: true,
+            ssid_cache: HashMap::new(),
         }
     }
 
     pub async fn refresh(&mut self) {
-        self.prev = std::mem::take(&mut self.current);
         self.current = Self::read_net_dev();
+
+        if self.first_tick || self.prev.is_empty() {
+            self.first_tick = false;
+            self.prev = self.current.clone();
+            return;
+        }
 
         for (prev, curr) in self.prev.iter().zip(self.current.iter()) {
             let rx_delta = curr.rx_bytes.saturating_sub(prev.rx_bytes);
@@ -77,19 +143,40 @@ impl NetworkCollector {
         deltas
     }
 
-    pub fn extended_info(&self) -> Vec<NetworkInfo> {
+    pub fn extended_info(&mut self) -> Vec<NetworkInfo> {
         let deltas = self.delta();
+        const SSID_TTL: std::time::Duration = std::time::Duration::from_secs(30);
         self.current
             .iter()
             .zip(deltas.iter())
-            .map(|(n, d)| NetworkInfo {
-                interface: n.interface.clone(),
-                current_rx: d.0,
-                current_tx: d.1,
-                top_rx: self.top_rx.get(&n.interface).copied().unwrap_or(0),
-                top_tx: self.top_tx.get(&n.interface).copied().unwrap_or(0),
-                total_rx: self.total_rx.get(&n.interface).copied().unwrap_or(0),
-                total_tx: self.total_tx.get(&n.interface).copied().unwrap_or(0),
+            .map(|(n, d)| {
+                let display_name = if is_wireless(&n.interface) {
+                    if let Some(cached) = self.ssid_cache.get(&n.interface) {
+                        if cached.1.elapsed() < SSID_TTL {
+                            cached.0.clone()
+                        } else {
+                            let ssid = get_wifi_ssid(&n.interface).unwrap_or_else(|| n.interface.clone());
+                            self.ssid_cache.insert(n.interface.clone(), (ssid.clone(), Instant::now()));
+                            ssid
+                        }
+                    } else {
+                        let ssid = get_wifi_ssid(&n.interface).unwrap_or_else(|| n.interface.clone());
+                        self.ssid_cache.insert(n.interface.clone(), (ssid.clone(), Instant::now()));
+                        ssid
+                    }
+                } else {
+                    n.interface.clone()
+                };
+                NetworkInfo {
+                    interface: n.interface.clone(),
+                    display_name,
+                    current_rx: d.0,
+                    current_tx: d.1,
+                    top_rx: self.top_rx.get(&n.interface).copied().unwrap_or(0),
+                    top_tx: self.top_tx.get(&n.interface).copied().unwrap_or(0),
+                    total_rx: self.total_rx.get(&n.interface).copied().unwrap_or(0),
+                    total_tx: self.total_tx.get(&n.interface).copied().unwrap_or(0),
+                }
             })
             .collect()
     }

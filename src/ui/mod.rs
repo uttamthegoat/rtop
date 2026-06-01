@@ -1,4 +1,3 @@
-mod layout;
 mod theme;
 mod process_table;
 mod cpu_widget;
@@ -57,5 +56,5 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     render_network_widget(frame, mid_layout[1], &state.system_stats, &theme);
     render_gpu_widget(frame, mid_layout[2], &state.system_stats, &theme);
     render_process_table(frame, main_layout[2], state, &theme);
-    render_footer(frame, main_layout[3], &theme);
+    render_footer(frame, main_layout[3], state, &theme);
 }
