@@ -1,4 +1,5 @@
 use crate::system::disk::DiskInfo;
+use crate::system::gpu::GpuInfo;
 use crate::system::network::NetworkInfo;
 use crate::utils::ring_buffer::RingBuffer;
 
@@ -26,6 +27,7 @@ pub struct SystemStats {
     pub load_average_15: f64,
     pub disks: Vec<DiskInfo>,
     pub network_info: Vec<NetworkInfo>,
+    pub gpu: GpuInfo,
 }
 
 impl Default for SystemStats {
@@ -53,6 +55,7 @@ impl Default for SystemStats {
             load_average_15: 0.0,
             disks: Vec::new(),
             network_info: Vec::new(),
+            gpu: GpuInfo::default(),
         }
     }
 }

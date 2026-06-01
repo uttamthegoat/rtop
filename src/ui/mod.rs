@@ -5,6 +5,7 @@ mod cpu_widget;
 mod memory_widget;
 mod disk_widget;
 mod network_widget;
+mod gpu_widget;
 mod footer;
 
 use crate::state::AppState;
@@ -13,6 +14,7 @@ pub use cpu_widget::*;
 pub use memory_widget::*;
 pub use disk_widget::*;
 pub use network_widget::*;
+pub use gpu_widget::*;
 pub use footer::*;
 
 use ratatui::Frame;
@@ -43,8 +45,9 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     let mid_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(50),
+            Constraint::Percentage(33),
+            Constraint::Percentage(33),
+            Constraint::Percentage(34),
         ])
         .split(main_layout[1]);
 
@@ -52,6 +55,7 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     render_memory_widget(frame, top_layout[1], &state.system_stats, &theme);
     render_disk_widget(frame, mid_layout[0], &state.system_stats, &theme);
     render_network_widget(frame, mid_layout[1], &state.system_stats, &theme);
+    render_gpu_widget(frame, mid_layout[2], &state.system_stats, &theme);
     render_process_table(frame, main_layout[2], state, &theme);
     render_footer(frame, main_layout[3], &theme);
 }

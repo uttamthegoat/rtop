@@ -10,6 +10,7 @@ pub struct AppState {
     pub show_tree: bool,
     pub scroll_offset: usize,
     pub should_quit: bool,
+    pub needs_refresh: bool,
     pub terminal_width: u16,
     pub terminal_height: u16,
 }
@@ -25,6 +26,7 @@ impl AppState {
             show_tree: false,
             scroll_offset: 0,
             should_quit: false,
+            needs_refresh: false,
             terminal_width: 0,
             terminal_height: 0,
         }

@@ -4,11 +4,13 @@ use crate::input::{map_key, Action};
 use crate::state::AppState;
 use crate::system::cpu::CpuCollector;
 use crate::system::disk::DiskCollector;
+use crate::system::gpu::GpuCollector;
 use crate::system::memory::MemoryCollector;
 use crate::system::network::NetworkCollector;
 use crate::system::process::{ProcessCollector, kill_process};
 use crate::ui;
 use anyhow::Result;
+use crossterm::event::{KeyCode, KeyEvent};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::execute;
 use ratatui::backend::CrosstermBackend;
@@ -24,6 +26,7 @@ pub struct App {
     disk_collector: DiskCollector,
     network_collector: NetworkCollector,
     process_collector: ProcessCollector,
+    gpu_collector: GpuCollector,
 }
 
 impl App {
@@ -35,6 +38,7 @@ impl App {
             disk_collector: DiskCollector::new(),
             network_collector: NetworkCollector::new(),
             process_collector: ProcessCollector::new(),
+            gpu_collector: GpuCollector::new(),
             config,
         })
     }
@@ -76,8 +80,17 @@ impl App {
                         self.draw(terminal)?;
                     }
                     Event::Key(key) => {
-                        let action = map_key(key);
-                        self.handle_action(action);
+                        if self.state.search_mode {
+                            self.handle_search_key(key);
+                        } else {
+                            let action = map_key(key);
+                            self.handle_action(action);
+                            self.draw(terminal)?;
+                        }
+                        if self.state.needs_refresh {
+                            self.refresh_data().await;
+                            self.state.needs_refresh = false;
+                        }
                     }
                     Event::Resize(w, h) => {
                         self.state.terminal_width = w;
@@ -97,6 +110,7 @@ impl App {
         self.disk_collector.refresh().await;
         self.network_collector.refresh().await;
         self.process_collector.refresh().await;
+        self.gpu_collector.refresh().await;
 
         self.state.system_stats.cpu_usage = self.cpu_collector.usage();
         self.state.system_stats.memory_total = self.memory_collector.total();
@@ -119,9 +133,47 @@ impl App {
             .filter(|n| n.interface != "lo")
             .collect();
 
+        self.state.system_stats.gpu = self.gpu_collector.info().clone();
+
         let mut processes = self.process_collector.processes();
         processes.sort_by(|a, b| b.cpu_percent.total_cmp(&a.cpu_percent));
+
+        if self.state.search_mode && !self.state.filter_text.is_empty() {
+            let filter = self.state.filter_text.to_lowercase();
+            processes.retain(|p| {
+                p.name.to_lowercase().contains(&filter)
+                    || p.command.to_lowercase().contains(&filter)
+            });
+        }
+
         self.state.processes = processes;
+        let max = self.state.processes.len().saturating_sub(1);
+        if self.state.selected_row > max {
+            self.state.selected_row = max;
+        }
+    }
+
+    fn handle_search_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char(c) => {
+                self.state.filter_text.push(c);
+                self.state.needs_refresh = true;
+            }
+            KeyCode::Backspace => {
+                self.state.filter_text.pop();
+                self.state.needs_refresh = true;
+            }
+            KeyCode::Esc => {
+                self.state.search_mode = false;
+                self.state.filter_text.clear();
+                self.state.needs_refresh = true;
+            }
+            KeyCode::Enter => {
+                self.state.search_mode = false;
+                self.state.needs_refresh = true;
+            }
+            _ => {}
+        }
     }
 
     fn handle_action(&mut self, action: Action) {
@@ -162,7 +214,9 @@ impl App {
                 }
             }
             Action::ToggleTree => self.state.show_tree = !self.state.show_tree,
-            Action::Refresh => {}
+            Action::Refresh => {
+                self.state.needs_refresh = true;
+            }
             Action::TabNext => {}
             Action::Enter => {}
             Action::Escape => {

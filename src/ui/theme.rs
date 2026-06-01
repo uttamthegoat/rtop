@@ -8,6 +8,7 @@ pub struct Theme {
     pub memory_bar: Color,
     pub disk_bar: Color,
     pub network_bar: Color,
+    pub gpu_bar: Color,
     pub text: Color,
     pub text_dim: Color,
     pub border: Color,
@@ -21,26 +22,27 @@ impl Default for Theme {
         Self {
             background: Color::Reset,
             foreground: Color::White,
-            highlight: Color::Yellow,
+            highlight: Color::Cyan,
             cpu_bar: Color::Cyan,
             memory_bar: Color::Green,
-            disk_bar: Color::Yellow,
+            disk_bar: Color::Blue,
             network_bar: Color::Blue,
+            gpu_bar: Color::Magenta,
             text: Color::White,
             text_dim: Color::DarkGray,
             border: Color::DarkGray,
-            title: Color::White,
+            title: Color::Cyan,
             selected_row: Style::default()
-                .fg(Color::Black)
-                .bg(Color::Yellow)
+                .fg(Color::White)
+                .bg(Color::Blue)
                 .add_modifier(Modifier::BOLD),
             cpu_core_colors: vec![
                 Color::Cyan,
-                Color::Magenta,
-                Color::Yellow,
-                Color::Red,
-                Color::Green,
                 Color::Blue,
+                Color::Green,
+                Color::Magenta,
+                Color::Red,
+                Color::White,
             ],
         }
     }

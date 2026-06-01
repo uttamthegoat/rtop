@@ -80,12 +80,12 @@ impl ProcessCollector {
         let priority = stat.priority;
         let threads = stat.num_threads as u64;
 
-        let name_clone = name.clone();
+        let cmdline = proc.cmdline().ok().map(|args| args.join(" ")).unwrap_or_else(|| name.clone());
         Some(ProcessInfo {
             pid,
             ppid,
             name,
-            command: name_clone,
+            command: cmdline,
             cpu_percent,
             memory_percent: if total_memory > 0 { rss as f64 / total_memory as f64 * 100.0 } else { 0.0 },
             memory_rss: rss,
